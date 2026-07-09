@@ -18,6 +18,8 @@ _Dành cho TICKET 1 (Khoa) - Ghi nhận thời gian phản hồi thực tế và
 | **Real LLM** (Gemini)   | `gemini-2.5-flash`        | 5624.31              | 6829.13          | 6917.79          | 60.00         |
 | **Real LLM** (Groq 8B)  | `llama-3.1-8b-instant`    | 594.82               | 773.89           | 781.55           | 30.00         |
 | **Real LLM** (Groq 70B) | `llama-3.3-70b-versatile` | 824.67               | 968.81           | 978.91           | 10.00         |
+| **Real LLM** (Bedrock)  | `amazon.nova-lite-v1:0` (via LiteLLM) | 1668.41              | 2281.35          | 2298.11          | 0.00          |
+
 
 ### 2. Ước tính Chi Phí (Cost Estimation)
 
