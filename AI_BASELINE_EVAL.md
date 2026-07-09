@@ -1,4 +1,4 @@
-﻿# Báo Cáo Đánh Giá AI Baseline & Kịch Bản Thử Nghiệm (Tuần 1)
+# Báo Cáo Đánh Giá AI Baseline & Kịch Bản Thử Nghiệm (Tuần 1)
 
 Báo cáo này lưu trữ các chỉ số đo lường hiệu năng, chi phí, độ chính xác (Fidelity), và các lỗ hổng bảo mật được phát hiện trên hệ thống AI của Nhóm AIE1 (Task Force 1).
 
@@ -12,26 +12,30 @@ _Dành cho TICKET 1 (Khoa) - Ghi nhận thời gian phản hồi thực tế và
 
 Đo đạc từ lúc client gọi gRPC tới `product-reviews` cho đến khi nhận được kết quả hoàn thành:
 
-| Kịch bản                | Model                     | Latency Average (ms) | Latency p95 (ms) | Latency p99 (ms) | Tỉ lệ lỗi (%) |
-| ----------------------- | ------------------------- | -------------------- | ---------------- | ---------------- | ------------- |
-| **Mock LLM** (Mặc định) | `techx-llm`               | 43.24                | 68.66            | 241.09           | 0.00          |
-| **Real LLM** (Gemini)   | `gemini-2.5-flash`        | 5624.31              | 6829.13          | 6917.79          | 60.00         |
-| **Real LLM** (Groq 8B)  | `llama-3.1-8b-instant`    | 594.82               | 773.89           | 781.55           | 30.00         |
-| **Real LLM** (Groq 70B) | `llama-3.3-70b-versatile` | 824.67               | 968.81           | 978.91           | 10.00         |
+| Kịch bản                | Model                                 | Latency Average (ms) | Latency p95 (ms) | Latency p99 (ms) | Tỉ lệ lỗi (%) |
+| ----------------------- | ------------------------------------- | -------------------- | ---------------- | ---------------- | ------------- |
+| **Mock LLM** (Mặc định) | `techx-llm`                           | 43.24                | 68.66            | 241.09           | 0.00          |
+| **Real LLM** (Gemini)   | `gemini-2.5-flash`                    | 5624.31              | 6829.13          | 6917.79          | 60.00         |
+| **Real LLM** (Groq 8B)  | `llama-3.1-8b-instant`                | 594.82               | 773.89           | 781.55           | 30.00         |
+| **Real LLM** (Groq 70B) | `llama-3.3-70b-versatile`             | 824.67               | 968.81           | 978.91           | 10.00         |
 | **Real LLM** (Bedrock)  | `amazon.nova-lite-v1:0` (via LiteLLM) | 1668.41              | 2281.35          | 2298.11          | 0.00          |
 
 
 ### 2. Ước tính Chi Phí (Cost Estimation)
 
-Dựa trên thống kê token từ OpenAI API:
+Dựa trên thống kê token đo đạc thực tế từ cuộc gọi RAG:
 
-- **Số token trung bình / request**:
-  - Input tokens (Prompt): `~795` tokens
-  - Output tokens (Completion): `~76` tokens
-- **Chi phí đơn giá (gpt-4o-mini)**:
-  - Input: `$0.150 / 1M tokens`
-  - Output: `$0.600 / 1M tokens`
-- **Chi phí ước tính trên 10,000 requests**: `~$1.65` USD
+* **Số token trung bình / request**:
+  * Input tokens (Prompt): `~795` tokens
+  * Output tokens (Completion): `~76` tokens
+
+* **Bảng so sánh chi phí (trên 10,000 requests)**:
+
+| Nhà cung cấp | Model | Đơn giá Input (/1M tokens) | Đơn giá Output (/1M tokens) | Chi phí ước tính (10k requests) | Ghi chú |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Groq** | `llama-3.3-70b-versatile` | `$0.590` | `$0.790` | **`~$5.29 USD`** | Trễ trung bình ~825 ms, chất lượng rất cao |
+| **AWS Bedrock** | `amazon.nova-lite-v1:0` | `$0.060` | `$0.240` | **`~$0.66 USD`** | Tiết kiệm **87.5% chi phí** so với Llama 3.3 70B |
+
 
 ---
 
