@@ -72,27 +72,28 @@ flowchart TD
     ConnectCatalog --> StartListen["Khởi động gRPC Server & lắng nghe kết nối"]
 ```
 
-### 3. Luồng GetProductReviews & GetAverageProductReviewScore (Database Queries)
-Cách thức xử lý các truy vấn trực tiếp vào PostgreSQL database:
+### 3. Luồng Database Queries (GetProductReviews & GetAverageProductReviewScore)
+Cách thức xử lý các truy vấn trực tiếp vào PostgreSQL database được chia làm 2 luồng độc lập để hiển thị rõ ràng nhất:
 
+#### 3.1. Luồng xử lý GetProductReviews
 ```mermaid
 flowchart TD
-    subgraph GetReviews ["GetProductReviews"]
-        ReqReviews(["Nhận GetProductReviews"]) --> SpanReviews["Bắt đầu trace span 'get_product_reviews'"]
-        SpanReviews --> FetchDB["Truy vấn reviews.productreviews từ DB Postgres"]
-        FetchDB --> LoopReviews["Lặp qua các bản ghi & thêm vào Response"]
-        LoopReviews --> CountMetric["Tăng metric 'app_product_review_counter'"]
-        CountMetric --> EndSpanReviews["Kết thúc trace span"]
-        EndSpanReviews --> RetReviews(["Trả về GetProductReviewsResponse"])
-    end
+    ReqReviews(["Nhận GetProductReviews"]) --> SpanReviews["Bắt đầu trace span 'get_product_reviews'"]
+    SpanReviews --> FetchDB["Truy vấn reviews.productreviews từ DB Postgres"]
+    FetchDB --> LoopReviews["Lặp qua các bản ghi & thêm vào Response"]
+    LoopReviews --> CountMetric["Tăng metric 'app_product_review_counter'"]
+    CountMetric --> EndSpanReviews["Kết thúc trace span"]
+    EndSpanReviews --> RetReviews(["Trả về GetProductReviewsResponse"])
+```
 
-    subgraph GetScore ["GetAverageProductReviewScore"]
-        ReqScore(["Nhận GetAverageProductReviewScore"]) --> SpanScore["Bắt đầu trace span 'get_average_product_review_score'"]
-        SpanScore --> FetchAvgDB["Tính điểm trung bình AVG(score) từ DB Postgres"]
-        FetchAvgDB --> SetScore["Gán average_score vào Response"]
-        SetScore --> EndSpanScore["Kết thúc trace span"]
-        EndSpanScore --> RetScore(["Trả về GetAverageProductReviewScoreResponse"])
-    end
+#### 3.2. Luồng xử lý GetAverageProductReviewScore
+```mermaid
+flowchart TD
+    ReqScore(["Nhận GetAverageProductReviewScore"]) --> SpanScore["Bắt đầu trace span 'get_average_product_review_score'"]
+    SpanScore --> FetchAvgDB["Tính điểm trung bình AVG(score) từ DB Postgres"]
+    FetchAvgDB --> SetScore["Gán average_score vào Response"]
+    SetScore --> EndSpanScore["Kết thúc trace span"]
+    EndSpanScore --> RetScore(["Trả về GetAverageProductReviewScoreResponse"])
 ```
 
 ### 4. Luồng xử lý AskProductAIAssistant (RAG Pipeline)
