@@ -79,8 +79,8 @@ def run_benchmark(num_requests=50):
             latencies.append(duration)
             print(f"[!] Request {i+1}/{num_requests} thất bại: {e}")
             
-        # Nghỉ nhẹ 50ms giữa các request để tránh làm overload server cục bộ
-        time.sleep(0.05)
+        # Nghỉ 1.5 giây giữa các request để tránh làm overload OpenAI Rate Limit (RPM)
+        time.sleep(1.5)
 
     if not latencies:
         print("[!] Không có cuộc gọi nào thành công hoặc ghi nhận được dữ liệu.")
