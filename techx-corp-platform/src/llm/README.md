@@ -42,48 +42,48 @@ Dưới đây là sơ đồ chi tiết biểu diễn luồng hoạt động củ
 flowchart TD
     %% Subgraph 1: Initialization
     subgraph Initialization ["1. Khởi tạo Dịch vụ (Main)"]
-        Start([Chạy app.py]) --> SetProvider[Cài đặt OpenFeature Provider với Flagd]
-        SetProvider --> LoadAccurate[Đọc 'product-review-summaries.json' bằng load_product_review_summaries]
-        LoadAccurate --> LoadInaccurate[Đọc 'inaccurate-product-review-summaries.json']
-        LoadInaccurate --> FlaskRun[Khởi chạy Flask Server trên Port 8000]
+        Start(["Chạy app.py"]) --> SetProvider["Cài đặt OpenFeature Provider với Flagd"]
+        SetProvider --> LoadAccurate["Đọc 'product-review-summaries.json' bằng load_product_review_summaries"]
+        LoadAccurate --> LoadInaccurate["Đọc 'inaccurate-product-review-summaries.json'"]
+        LoadInaccurate --> FlaskRun["Khởi chạy Flask Server trên Port 8000"]
     end
 
     %% Subgraph 2: GET /v1/models
     subgraph GET_Models ["2. GET /v1/models"]
-        ReqModels([Nhận request /v1/models]) --> RetModels[Trả về JSON danh sách model: techx-llm]
+        ReqModels(["Nhận request /v1/models"]) --> RetModels["Trả về JSON danh sách model: techx-llm"]
     end
 
     %% Subgraph 3: POST /v1/chat/completions
     subgraph POST_Chat ["3. POST /v1/chat/completions"]
-        ReqChat([Nhận request POST]) --> ParsePayload[Lấy json body: messages, stream, model, tools]
-        ParsePayload --> GetLastMsg[Lấy last_message = messages[-1]['content']]
-        GetLastMsg --> MatchAge{last_message chứa 'What age(s) is this recommended for?'}
+        ReqChat(["Nhận request POST"]) --> ParsePayload["Lấy json body: messages, stream, model, tools"]
+        ParsePayload --> GetLastMsg["Lấy last_message = messages[-1]['content']"]
+        GetLastMsg --> MatchAge{"last_message chứa 'What age(s) is this recommended for?'"}
         
-        MatchAge -->|Đúng| RetAge[Trả về: This product is recommended for ages 7 and above.]
-        MatchAge -->|Sai| MatchNegative{last_message chứa 'Were there any negative reviews?'}
+        MatchAge -->|Đúng| RetAge["Trả về: This product is recommended for ages 7 and above."]
+        MatchAge -->|Sai| MatchNegative{"last_message chứa 'Were there any negative reviews?'"}
         
-        MatchNegative -->|Đúng| RetNegative[Trả về: No, there were no reviews less than three stars...]
-        MatchNegative -->|Sai| CheckAllowed{last_message chứa 'Can you summarize...' hoặc 'Based on the tool results...'}
+        MatchNegative -->|Đúng| RetNegative["Trả về: No, there were no reviews less than three stars..."]
+        MatchNegative -->|Sai| CheckAllowed{"last_message chứa 'Can you summarize...' hoặc 'Based on the tool results...'"}
         
-        CheckAllowed -->|Sai| RetSorry[Trả về: Sorry, I'm not able to answer that question.]
-        CheckAllowed -->|Đúng| ParsePID[Gọi parse_product_id: quét Regex tìm product_id]
+        CheckAllowed -->|Sai| RetSorry["Trả về: Sorry, I'm not able to answer that question."]
+        CheckAllowed -->|Đúng| ParsePID["Gọi parse_product_id: quét Regex tìm product_id"]
         
-        ParsePID --> MatchPID{Trùng Regex: 'product ID:...' hoặc 'inaccurate:...'}
-        MatchPID -->|Không trùng| RaiseErr[Ném lỗi ValueError]
-        MatchPID -->|Trùng| CheckTools{Tham số tools != None?}
+        ParsePID --> MatchPID{"Trùng Regex: 'product ID:...' hoặc 'inaccurate:...'"}
+        MatchPID -->|Không trùng| RaiseErr["Ném lỗi ValueError"]
+        MatchPID -->|Trùng| CheckTools{"Tham số tools != None?"}
         
-        CheckTools -->|Đúng| CheckRateLimit{model kết thúc bằng 'rate-limit'?}
-        CheckRateLimit -->|Đúng| Ret429[Trả về HTTP 429 - Rate limit reached]
-        CheckRateLimit -->|Sai| RetToolCall[Trả về yêu cầu Client gọi Tool: fetch_product_reviews]
+        CheckTools -->|Đúng| CheckRateLimit{"model kết thúc bằng 'rate-limit'?"}
+        CheckRateLimit -->|Đúng| Ret429["Trả về HTTP 429 - Rate limit reached"]
+        CheckRateLimit -->|Sai| RetToolCall["Trả về yêu cầu Client gọi Tool: fetch_product_reviews"]
         
-        CheckTools -->|Sai| GenResp[Gọi generate_response]
-        GenResp --> CheckFlag{Flag llmInaccurateResponse bật AND product_id == 'L9ECAV7KIM'?}
-        CheckFlag -->|Đúng| GetInaccurate[Lấy summary từ file inaccurate]
-        CheckFlag -->|Sai| GetAccurate[Lấy summary từ file accurate]
+        CheckTools -->|Sai| GenResp["Gọi generate_response"]
+        GenResp --> CheckFlag{"Flag llmInaccurateResponse bật AND product_id == 'L9ECAV7KIM'?"}
+        CheckFlag -->|Đúng| GetInaccurate["Lấy summary từ file inaccurate"]
+        CheckFlag -->|Sai| GetAccurate["Lấy summary từ file accurate"]
         
-        GetInaccurate --> BuildResp[Đóng gói phản hồi bằng build_response]
+        GetInaccurate --> BuildResp["Đóng gói phản hồi bằng build_response"]
         GetAccurate --> BuildResp
-        BuildResp --> RetFinal[Trả về JSON Chat Completion với finish_reason: stop]
+        BuildResp --> RetFinal["Trả về JSON Chat Completion với finish_reason: stop"]
     end
 
     %% Styles

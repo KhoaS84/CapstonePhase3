@@ -50,93 +50,98 @@ Dưới đây là sơ đồ Mermaid chi tiết thể hiện toàn bộ luồng h
 flowchart TD
     %% Subgraph 1: Initialization Flow
     subgraph Initialization ["1. Khởi tạo Dịch vụ (Main)"]
-        Start([Chạy product_reviews_server.py]) --> Env[Đọc các biến môi trường: OTEL_SERVICE_NAME, LLM_HOST, LLM_PORT, LLM_BASE_URL, OPENAI_API_KEY, LLM_MODEL, PRODUCT_CATALOG_ADDR, PRODUCT_REVIEWS_PORT]
-        Env --> SetFlagd[Cài đặt FlagdProvider cho OpenFeature]
-        SetFlagd --> InitOtel[Khởi tạo OpenTelemetry Tracer, Meter & Metrics bằng init_metrics]
-        InitOtel --> InitLogs[Cấu hình OpenTelemetry Logger, LoggerProvider & BatchLogRecordProcessor với OTLPLogExporter]
-        InitLogs --> CreateServer[Tạo gRPC Server sử dụng ThreadPoolExecutor với tối đa 10 workers]
-        CreateServer --> RegServices[Đăng ký ProductReviewService & Health Service vào Server]
-        RegServices --> ConnectCatalog[Thiết lập grpc.insecure_channel với Product Catalog Service và tạo ProductCatalogServiceStub]
-        ConnectCatalog --> StartListen[Đăng ký insecure port PRODUCT_REVIEWS_PORT, khởi động server.start và chạy server.wait_for_termination]
+        Start(["Chạy product_reviews_server.py"]) --> Env["Đọc các biến môi trường: OTEL_SERVICE_NAME, LLM_HOST, LLM_PORT, LLM_BASE_URL, OPENAI_API_KEY, LLM_MODEL, PRODUCT_CATALOG_ADDR, PRODUCT_REVIEWS_PORT"]
+        Env --> SetFlagd["Cài đặt FlagdProvider cho OpenFeature"]
+        SetFlagd --> InitOtel["Khởi tạo OpenTelemetry Tracer, Meter và Metrics bằng init_metrics"]
+        InitOtel --> InitLogs["Cấu hình OpenTelemetry Logger, LoggerProvider và BatchLogRecordProcessor với OTLPLogExporter"]
+        InitLogs --> CreateServer["Tạo gRPC Server sử dụng ThreadPoolExecutor với tối đa 10 workers"]
+        CreateServer --> RegServices["Đăng ký ProductReviewService và Health Service vào Server"]
+        RegServices --> ConnectCatalog["Thiết lập grpc.insecure_channel với Product Catalog Service và tạo ProductCatalogServiceStub"]
+        ConnectCatalog --> StartListen["Đăng ký insecure port PRODUCT_REVIEWS_PORT, khởi động server.start và chạy server.wait_for_termination"]
     end
 
     %% Subgraph 2: GetProductReviews
     subgraph GetProductReviewsFlow ["2. Luồng xử lý GetProductReviews"]
-        ReqReviews([Nhận yêu cầu gRPC GetProductReviews]) --> SpanReviews[Bắt đầu trace span 'get_product_reviews']
-        SpanReviews --> FetchDB[Gọi fetch_product_reviews_from_db]
-        FetchDB --> LoopReviews[Lặp qua các bản ghi database & thêm dữ liệu vào GetProductReviewsResponse]
-        LoopReviews --> CountMetric[Ghi nhận count vào metric 'app_product_review_counter' kèm attribute product.id]
-        CountMetric --> EndSpanReviews[Thiết lập thuộc tính span & kết thúc span]
-        EndSpanReviews --> RetReviews([Trả về GetProductReviewsResponse cho Client])
+        ReqReviews(["Nhận yêu cầu gRPC GetProductReviews"]) --> SpanReviews["Bắt đầu trace span 'get_product_reviews'"]
+        SpanReviews --> FetchDB["Gọi fetch_product_reviews_from_db"]
+        FetchDB --> LoopReviews["Lặp qua các bản ghi database và thêm dữ liệu vào GetProductReviewsResponse"]
+        LoopReviews --> CountMetric["Ghi nhận count vào metric 'app_product_review_counter' kèm attribute product.id"]
+        CountMetric --> EndSpanReviews["Thiết lập thuộc tính span và kết thúc span"]
+        EndSpanReviews --> RetReviews(["Trả về GetProductReviewsResponse cho Client"])
     end
 
     %% Subgraph 3: GetAverageProductReviewScore
     subgraph GetAverageProductReviewScoreFlow ["3. Luồng xử lý GetAverageProductReviewScore"]
-        ReqScore([Nhận yêu cầu gRPC GetAverageProductReviewScore]) --> SpanScore[Bắt đầu trace span 'get_average_product_review_score']
-        SpanScore --> FetchAvgDB[Gọi fetch_avg_product_review_score_from_db]
-        FetchAvgDB --> SetScore[Gán average_score vào GetAverageProductReviewScoreResponse]
-        SetScore --> EndSpanScore[Thiết lập thuộc tính span & kết thúc span]
-        EndSpanScore --> RetScore([Trả về GetAverageProductReviewScoreResponse cho Client])
+        ReqScore(["Nhận yêu cầu gRPC GetAverageProductReviewScore"]) --> SpanScore["Bắt đầu trace span 'get_average_product_review_score'"]
+        SpanScore --> FetchAvgDB["Gọi fetch_avg_product_review_score_from_db"]
+        FetchAvgDB --> SetScore["Gán average_score vào GetAverageProductReviewScoreResponse"]
+        SetScore --> EndSpanScore["Thiết lập thuộc tính span và kết thúc span"]
+        EndSpanScore --> RetScore(["Trả về GetAverageProductReviewScoreResponse cho Client"])
     end
 
     %% Subgraph 4: AskProductAIAssistant
     subgraph AskProductAIAssistantFlow ["4. Luồng xử lý AskProductAIAssistant"]
-        ReqAI([Nhận yêu cầu gRPC AskProductAIAssistant]) --> SpanAI[Bắt đầu trace span 'get_ai_assistant_response']
-        SpanAI --> FlagRate[Kiểm tra Feature Flag 'llmRateLimitError']
+        ReqAI(["Nhận yêu cầu gRPC AskProductAIAssistant"]) --> SpanAI["Bắt đầu trace span 'get_ai_assistant_response'"]
+        SpanAI --> FlagRate["Kiểm tra Feature Flag 'llmRateLimitError'"]
         
-        FlagRate -->|Đang bật| RandCheck{Số ngẫu nhiên < 0.5?}
-        FlagRate -->|Đang tắt| NormalClient[Khởi tạo OpenAI Client với llm_base_url và llm_api_key]
+        FlagRate -->|Đang bật| RandCheck{"Số ngẫu nhiên nhỏ hơn 0.5?"}
+        FlagRate -->|Đang tắt| NormalClient["Khởi tạo OpenAI Client với llm_base_url và llm_api_key"]
         
-        RandCheck -->|Đúng (Giả lập lỗi 429)| MockClient[Khởi tạo OpenAI Client với llm_mock_url và llm_api_key]
+        RandCheck -->|Đúng - Giả lập lỗi 429| MockClient["Khởi tạo OpenAI Client với llm_mock_url và llm_api_key"]
         RandCheck -->|Sai| NormalClient
         
-        MockClient --> CallMock[Gọi Mock LLM lần 1 với model 'techx-llm-rate-limit' & tools & tool_choice='auto']
-        CallMock --> TryCatch{Bắt Exception 429 từ Mock LLM?}
-        TryCatch -->|Có lỗi Exception| RecException[Ghi Exception vào Span & thiết lập Status ERROR]
-        RecException --> RetFallback[Trả về phản hồi lỗi hệ thống thân thiện]
+        MockClient --> CallMock["Gọi Mock LLM lần 1 với model 'techx-llm-rate-limit', tools và tool_choice='auto'"]
+        CallMock --> TryCatch{"Bắt Exception 429 từ Mock LLM?"}
+        TryCatch -->|Có lỗi Exception| RecException["Ghi Exception vào Span và thiết lập Status ERROR"]
+        RecException --> RetFallback["Trả về phản hồi lỗi hệ thống thân thiện"]
         TryCatch -->|Không lỗi| NormalClient
         
-        NormalClient --> CallLLM1[Gọi LLM lần 1 với model thực tế, prompt của user, tools & tool_choice='auto']
-        CallLLM1 --> ToolReq{LLM phản hồi yêu cầu gọi Tool (tool_calls)?}
+        NormalClient --> CallLLM1["Gọi LLM lần 1 với model thực tế, prompt của user, tools và tool_choice='auto'"]
+        CallLLM1 --> ToolReq{"LLM phản hồi yêu cầu gọi Tool?"}
         
-        ToolReq -->|Không| RetNormal[Lấy nội dung câu trả lời trực tiếp từ response_message.content]
-        ToolReq -->|Có| AppendCalls[Thêm tin nhắn response_message của trợ lý vào messages]
+        ToolReq -->|Không| RetNormal["Lấy nội dung câu trả lời trực tiếp từ response_message.content"]
+        ToolReq -->|Có| AppendCalls["Thêm tin nhắn response_message của trợ lý vào messages"]
         
-        AppendCalls --> LoopTools[Lặp qua từng tool_call yêu cầu từ LLM]
-        LoopTools --> ToolType{Xác định tên hàm}
+        AppendCalls --> LoopTools["Lặp qua từng tool_call yêu cầu từ LLM"]
+        LoopTools --> ToolType{"Xác định tên hàm"}
         
-        ToolType -->|fetch_product_reviews| RunReviewTool[Gọi fetch_product_reviews cục bộ với product_id từ arguments]
-        ToolType -->|fetch_product_info| RunInfoTool[Gọi fetch_product_info cục bộ: gọi product_catalog_stub.GetProduct qua gRPC]
-        ToolType -->|Tên khác| RaiseToolErr[Ném Exception lỗi tool không xác định]
+        ToolType -->|fetch_product_reviews| RunReviewTool["Gọi fetch_product_reviews cục bộ với product_id từ arguments"]
+        ToolType -->|fetch_product_info| RunInfoTool["Gọi fetch_product_info cục bộ: gọi product_catalog_stub.GetProduct qua gRPC"]
+        ToolType -->|Tên khác| RaiseToolErr["Ném Exception lỗi tool không xác định"]
         
-        RunReviewTool --> AppendToolMsg[Thêm kết quả trả về từ tool vào messages dạng role='tool']
+        RunReviewTool --> AppendToolMsg["Thêm kết quả trả về từ tool vào messages dạng role='tool'"]
         RunInfoTool --> AppendToolMsg
         
-        AppendToolMsg --> FlagInaccurate{Kiểm tra Flag 'llmInaccurateResponse' bật AND product_id == 'L9ECAV7KIM'?}
+        AppendToolMsg --> FlagInaccurate{"Kiểm tra Flag llmInaccurateResponse bật và ID L9ECAV7KIM?"}
         
-        FlagInaccurate -->|Đúng| PromptInaccurate[Thêm tin nhắn User yêu cầu trả lời SAI lệch: '...make the answer inaccurate...']
-        FlagInaccurate -->|Sai| PromptAccurate[Thêm tin nhắn User yêu cầu trả lời ĐÚNG thực tế: 'Based on the tool results...']
+        FlagInaccurate -->|Đúng| PromptInaccurate["Thêm tin nhắn User yêu cầu trả lời SAI lệch: '...make the answer inaccurate...'"]
+        FlagInaccurate -->|Sai| PromptAccurate["Thêm tin nhắn User yêu cầu trả lời ĐÚNG thực tế: 'Based on the tool results...'"]
         
-        PromptInaccurate --> CallLLM2[Gọi LLM lần 2 với danh sách messages chứa lịch sử tool call và hướng dẫn cuối]
+        PromptInaccurate --> CallLLM2["Gọi LLM lần 2 với danh sách messages chứa lịch sử tool call và hướng dẫn cuối"]
         PromptAccurate --> CallLLM2
         
-        CallLLM2 --> SetResult[Gán nội dung content của LLM lần 2 làm câu trả lời final]
+        CallLLM2 --> SetResult["Gán nội dung content của LLM lần 2 làm câu trả lời final"]
         
-        RetNormal --> IncMetric[Tăng chỉ số metric 'app_ai_assistant_counter' kèm attribute product.id]
+        RetNormal --> IncMetric["Tăng chỉ số metric 'app_ai_assistant_counter' kèm attribute product.id"]
         SetResult --> IncMetric
         RetFallback --> IncMetric
         
-        IncMetric --> EndSpanAI[Kết thúc trace span]
-        EndSpanAI --> RetAIResponse([Trả về AskProductAIAssistantResponse cho Client])
+        IncMetric --> EndSpanAI["Kết thúc trace span"]
+        EndSpanAI --> RetAIResponse(["Trả về AskProductAIAssistantResponse cho Client"])
     end
 
     %% Styles
-    classDef init fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef get fill:#bbf,stroke:#333,stroke-width:2px;
-    classDef post fill:#bfb,stroke:#333,stroke-width:2px;
+    classDef init fill:#f9f,stroke:#333,stroke-width:2px
+    classDef get fill:#bbf,stroke:#333,stroke-width:2px
+    classDef post fill:#bfb,stroke:#333,stroke-width:2px
     
-    class Start,ReqReviews,ReqScore,ReqAI init;
-    class RetReviews,RetScore,RetAIResponse get;
+    class Start init
+    class ReqReviews init
+    class ReqScore init
+    class ReqAI init
+    class RetReviews get
+    class RetScore get
+    class RetAIResponse get
 ```
 
 ## Chi tiết các luồng xử lý chính
