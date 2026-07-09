@@ -37,7 +37,28 @@ Dựa trên thống kê token đo đạc thực tế từ cuộc gọi RAG:
 | **AWS Bedrock** | `amazon.nova-lite-v1:0` | `$0.060` | `$0.240` | **`~$0.66 USD`** | Tiết kiệm **87.5% chi phí** so với Llama 3.3 70B |
 
 
+### 3. Phân tích & Nhận định kỹ thuật (Technical Analysis & Insights)
+
+* **Phân tích độ ổn định và tỷ lệ lỗi (Reliability)**:
+  * **Gemini 2.5 Flash**: Tỷ lệ lỗi cực cao (**60.00%**) chủ yếu do cạn kiệt tài nguyên (Quota Limitations - 20 requests/ngày ở tài khoản miễn phí). Không đủ điều kiện chạy sản xuất.
+  * **Llama 3.1 8B (Groq)**: Tỷ lệ lỗi **30.00%** do lỗi cú pháp gọi tool (Tool-calling syntax hallucination). Mô hình này thường tự biên dịch sai tên hàm (ví dụ: gọi nhầm thành `fetech_product_reviews`) hoặc truyền sai cấu trúc JSON.
+  * **Llama 3.3 70B (Groq)**: Độ chính xác cải thiện rõ rệt (chỉ **10.00%** lỗi), nhờ kích thước tham số lớn hơn giúp tuân thủ chỉ dẫn (System Prompt) tốt hơn.
+  * **Amazon Nova Lite (Bedrock)**: Đạt độ ổn định tuyệt đối (**0.00%** lỗi). Mô hình bám sát cấu trúc Tool Calling rất tốt và tương thích cao khi được lọc/chuẩn hóa tham số qua LiteLLM.
+
+* **Phân tích đánh đổi giữa Độ trễ và Chi phí (Latency vs. Cost Trade-offs)**:
+  * **Groq Llama 3.3 70B** là mô hình có tốc độ nhanh nhất (**~825 ms**) nhưng chi phí cao hơn (**$5.29 / 10k requests**).
+  * **AWS Bedrock Nova Lite** có độ trễ lớn hơn một chút (**~1668 ms**) nhưng chi phí rẻ một cách vượt trội (**$0.66 / 10k requests** - rẻ hơn gấp 8 lần).
+
 ---
+
+### 4. Khuyến nghị thiết kế kiến trúc (Architectural Recommendations)
+
+Dựa trên kết quả thực nghiệm, nhóm Task Force khuyến nghị cấu hình hệ thống theo mô hình **Hybrid/Fallback**:
+1. **Primary Model (Mô hình chính)**: Cấu hình **AWS Bedrock Nova Lite** làm mô hình chính chạy RAG. Mô hình này đảm bảo tính ổn định tuyệt đối (0% lỗi) và tối ưu hóa tối đa chi phí vận hành cho doanh nghiệp.
+2. **Fallback Model (Mô hình dự phòng)**: Khi Bedrock gặp sự cố mạng hoặc hết hạn mức, hệ thống tự động chuyển hướng cuộc gọi (Fallback) sang **Groq Llama 3.3 70B** để giữ độ trễ thấp, hoặc degrade về **Mock LLM** (nếu mất hoàn toàn kết nối internet) để đảm bảo storefront không bị treo.
+
+---
+
 
 ## MỤC 2: Bộ Đánh Giá Độ Trung Thực (Fidelity Evaluation)
 
