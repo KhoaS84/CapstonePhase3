@@ -436,7 +436,8 @@ Static summary có thể được lưu trong PostgreSQL, cùng DB hiện tại c
 Khi flag `llmRateLimitError` bật:
 
 - Hiện tại: mock LLM trả về 429 → exception không được xử lý → crash.
-- Sau khi có fallback: exception được bắt → kiểm tra DB có static summary không → nếu có thì trả về summary + log `app.fallback.triggered=true` → người dùng vẫn nhận được câu trả lời.### 5. Tích hợp Observability
+- Sau khi có fallback: exception được bắt → kiểm tra DB có static summary không → nếu có thì trả về summary + log `app.fallback.triggered=true` → người dùng vẫn nhận được câu trả lời.
+### 5. Tích hợp Observability
 
 Để phân biệt response từ LLM thật và từ fallback trên dashboard:
 
