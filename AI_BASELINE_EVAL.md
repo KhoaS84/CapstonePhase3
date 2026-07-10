@@ -329,12 +329,14 @@ _Dành cho TICKET 3 (Kiên) - Phân tích các lỗ hổng bảo mật và rò r
 
 ### 2. Bảng tổng hợp trạng thái PII
 
-| Loại dữ liệu               | Nguồn                                      | Đường đi tới Bedrock Nova Lite              | Trạng thái      |
-| -------------------------- | ------------------------------------------ | ------------------------------------------- | --------------- |
-| `product_id` nội bộ        | `request_product_id`                       | Nhúng trong `user_prompt` + final message   | ⚠️ Đang fix     |
-| Username DB                | `fetch_product_reviews` → `messages[tool]` | Gửi nguyên văn tới Bedrock Nova Lite        | ⚠️ Cần đánh giá |
-| Email trong review         | `fetch_product_reviews` → `messages[tool]` | Không có masking, gửi tới Bedrock Nova Lite | ⚠️ Rủi ro       |
-| Số điện thoại trong review | `fetch_product_reviews` → `messages[tool]` | Không có masking, gửi tới Bedrock Nova Lite | ⚠️ Rủi ro       |
+Cột **"Đường đi tới Bedrock Nova Lite"** mô tả hành trình của từng loại dữ liệu từ lúc rời khỏi hệ thống nội bộ cho đến khi đến tay LLM — bao gồm cách nó được đưa vào `messages[]`, bước nào xử lý hoặc bỏ qua nó, và cuối cùng nó có đến được Bedrock không. Đây là yếu tố quan trọng để đánh giá nguy cơ data leakage ra ngoài hạ tầng kiểm soát của tổ chức.
+
+| Loại dữ liệu               | Nguồn                                      | Đường đi tới Bedrock Nova Lite                                                                               | Trạng thái      |
+| -------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | --------------- |
+| `product_id` nội bộ        | `request_product_id`                       | Nhúng trực tiếp vào `user_prompt` string → append vào `messages[role=user]` → gửi thẳng tới Bedrock          | ⚠️ Đang fix     |
+| Username DB                | `fetch_product_reviews` → `messages[tool]` | Có trong raw DB row → serialize thành JSON string → append vào `messages[role=tool]` → gửi tới Bedrock       | ⚠️ Cần đánh giá |
+| Email trong review         | `fetch_product_reviews` → `messages[tool]` | Có trong nội dung review → không qua bất kỳ lớp lọc nào → append vào `messages[role=tool]` → gửi tới Bedrock | ⚠️ Rủi ro       |
+| Số điện thoại trong review | `fetch_product_reviews` → `messages[tool]` | Có trong nội dung review → không qua bất kỳ lớp lọc nào → append vào `messages[role=tool]` → gửi tới Bedrock | ⚠️ Rủi ro       |
 
 ---
 
@@ -375,7 +377,7 @@ Hai hướng tiếp cận có thể kết hợp:
 
 - **Rule-based (Regex)**: phát hiện nhanh, deterministic, chi phí thấp, phù hợp cho email và số điện thoại có định dạng rõ ràng. Nhược điểm: false positive nếu dữ liệu có chuỗi số giống định dạng PII.
 
-- **NER-based (Named Entity Recognition)**: chính xác hơn cho tên người, địa chỉ. Chi phí cao hơn về latency. Phù hợp cho giai đoạn nâng cấp sau.
+- **NER-based (Named Entity Recognition)**: là kỹ thuật thuộc nhóm NLP (Natural Language Processing), dùng mô hình học máy để nhận diện và phân loại các thực thể có tên trong văn bản — ví dụ tên người (`PERSON`), địa điểm (`LOCATION`), tổ chức (`ORGANIZATION`), số điện thoại, địa chỉ email, v.v. Thay vì match cứng theo pattern như Regex, NER hiểu ngữ cảnh câu để phán đoán đâu là thông tin nhạy cảm. Ví dụ: chuỗi `"Nguyễn Văn A"` trong review sẽ được NER gán nhãn `PERSON` và có thể bị mask thành `[NAME]`, trong khi Regex thuần không thể làm được điều này. Nhược điểm: chi phí cao hơn về latency và cần load model vào memory. Phù hợp cho giai đoạn nâng cấp sau khi Regex đã được triển khai ổn định.
 
 Giai đoạn 1 (hiện tại): triển khai Regex cho email và số điện thoại VN — đây là hai loại phổ biến nhất và có pattern xác định.
 
@@ -412,31 +414,79 @@ Hiện tại trong `get_ai_assistant_response()`, các lời gọi `client.chat.
 
 Hành vi này càng rõ khi bật flag `llmRateLimitError`: 50% request sẽ cố tình fail để simulate rate limit, nhưng hệ thống hiện không có cơ chế phục hồi.
 
-### 2. Kiến trúc Fallback nhiều tầng
+### 2. Nguyên tắc thiết kế: Không để lỗi "naked" đến người dùng
 
-Thiết kế theo nguyên tắc **graceful degradation** — mỗi tầng thất bại thì xuống tầng tiếp theo, không bao giờ để lỗi naked đến người dùng:
+**"Lỗi naked"** (naked error) là khi một exception kỹ thuật nội bộ được trả thẳng về phía người dùng mà không qua bất kỳ lớp xử lý nào — ví dụ: HTTP 500, stack trace, hoặc response body trống. Đây là trải nghiệm tệ nhất có thể xảy ra với người dùng cuối vì họ không hiểu lỗi là gì và không biết phải làm gì tiếp theo, trong khi hệ thống lẽ ra vẫn có thể phục vụ một dạng nội dung nào đó.
+
+Nguyên tắc thiết kế là: **mọi exception đều phải được bắt, phân loại, và xử lý thành một response có nghĩa trước khi trả về gRPC caller**. Người dùng luôn nhận được một câu trả lời — dù chất lượng có thể thấp hơn bình thường.
+
+### 3. Kiến trúc Fallback nhiều tầng
+
+Thiết kế theo nguyên tắc **graceful degradation** — mỗi tầng thất bại thì tự động xuống tầng tiếp theo:
 
 ```
 Tầng 1 (Primary)    → Bedrock Nova Lite via LiteLLM (real-time LLM response)
-        ↓ lỗi / timeout / exception
+        ↓ exception / timeout / lỗi 4xx-5xx từ API
 Tầng 2 (Fallback 1) → Static summary từ PostgreSQL (pre-computed)
-        ↓ không có data
-Tầng 3 (Fallback 2) → Thông báo thân thiện ("Tính năng tạm thời không khả dụng")
+        ↓ không có row trong DB cho product_id này
+Tầng 3 (Fallback 2) → Generic message thân thiện
 ```
 
-### 3. Nguồn dữ liệu cho Tầng 2
+### 4. Cơ chế hoạt động từng tầng
 
-Static summary có thể được lưu trong PostgreSQL, cùng DB hiện tại của hệ thống, không cần dependency mới. Dữ liệu này được sinh ra theo một trong hai cách:
+**Tầng 1 — Bedrock Nova Lite (Primary)**
+
+Đây là luồng chính hiện tại: `product-reviews` gọi LiteLLM proxy → LiteLLM forward tới Bedrock API → nhận response → trả về gRPC. Tầng này hoạt động bình thường khi mạng ổn định, credentials hợp lệ, và Bedrock không bị throttle. Nếu bất kỳ điều kiện nào trong số này bị vi phạm, một exception sẽ được throw.
+
+**Tầng 2 — Static Summary từ PostgreSQL**
+
+Khi exception bị bắt, hệ thống không dừng lại mà tiếp tục bằng cách query bảng `product_summaries` trong PostgreSQL theo `product_id`. Bảng này chứa các tóm tắt được pre-compute sẵn — có thể được sinh ra bởi batch job hàng đêm hoặc được cache lại từ lần LLM gọi thành công trước đó.
+
+Nếu có row tương ứng: trả về `summary_text` từ DB, đánh dấu span attribute `app.fallback.source = "database"` và log `WARNING` để audit trail. Người dùng nhận được câu trả lời có nội dung thực, chỉ là không phải real-time.
+
+**Tầng 3 — Generic Message (Last Resort)**
+
+Nếu không tìm thấy row nào trong `product_summaries` cho `product_id` đó (sản phẩm mới, chưa có batch job chạy, hoặc DB cũng bị lỗi), hệ thống trả về một thông báo thân thiện cố định, ví dụ:
+
+> _"Product review summary is temporarily unavailable. Please try again in a few moments."_
+
+Đây là tầng cuối cùng — luôn thành công vì không có dependency nào. Không có exception nào có thể vượt qua tầng này để đến người dùng. Span attribute `app.fallback.source = "generic_message"` được ghi lại để phân biệt trên dashboard.
+
+### 5. Toàn bộ luồng xử lý khi có lỗi
+
+```
+LLM call thất bại
+        ↓
+Exception bị bắt → log error + record span exception
+        ↓
+Query DB: SELECT summary_text FROM product_summaries WHERE product_id = ?
+        ↓
+        ├── Có data → trả về static summary
+        │            log WARNING: app.fallback.source = "database"
+        │            app.fallback.triggered = true
+        │
+        └── Không có data → trả về generic message
+                           log WARNING: app.fallback.source = "generic_message"
+                           app.fallback.triggered = true
+```
+
+Trong cả hai trường hợp fallback, người dùng nhận được HTTP 200 với nội dung thay vì HTTP 500.
+
+### 6. Nguồn dữ liệu cho Tầng 2
+
+Static summary có thể được lưu trong PostgreSQL cùng DB hiện tại của hệ thống, không cần dependency mới. Dữ liệu này được sinh ra theo một trong hai cách:
 
 - **Batch job offline**: chạy định kỳ (ví dụ: hàng đêm), gọi LLM cho từng sản phẩm có review, lưu kết quả vào bảng `product_summaries`. Khi production LLM bị lỗi, serve từ bảng này.
 - **Cache-on-success**: lần đầu LLM trả về thành công, lưu response vào bảng ngay trong request đó. Request sau nếu LLM lỗi thì có data để fallback.
 
-### 4. Xử lý kịch bản llmRateLimitError
+### 7. Xử lý kịch bản llmRateLimitError
 
-Khi flag `llmRateLimitError` bật:
+Khi flag `llmRateLimitError` bật, mock LLM trả về 429 → exception được bắt tại tầng 1 → hệ thống tự động kiểm tra DB:
 
-- Hiện tại: mock LLM trả về 429 → exception không được xử lý → crash.
-- Sau khi có fallback: exception được bắt → kiểm tra DB có static summary không → nếu có thì trả về summary + log `app.fallback.triggered=true` → người dùng vẫn nhận được câu trả lời.### 5. Tích hợp Observability
+- Nếu có static summary: người dùng nhận được tóm tắt từ DB, không thấy lỗi.
+- Nếu không có: người dùng nhận được generic message thân thiện, vẫn không thấy HTTP 500.
+
+### 8. Tích hợp Observability
 
 Để phân biệt response từ LLM thật và từ fallback trên dashboard:
 
