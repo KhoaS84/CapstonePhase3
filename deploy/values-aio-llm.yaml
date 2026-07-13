@@ -4,8 +4,8 @@ components:
   product-reviews:
     envOverrides:
       - name: LLM_BASE_URL
-        value: https://api.openai.com/v1        # hoặc Bedrock-compatible gateway
+        value: http://litellm-service:4000/v1        # Địa chỉ Service LiteLLM chạy trong cluster EKS
       - name: LLM_MODEL
-        value: gpt-4o-mini
+        value: amazon.nova-lite-v1:0                 # Định dạng model Nova Lite chính xác
       - name: OPENAI_API_KEY
         valueFrom: { secretKeyRef: { name: llm-api-key, key: key } }
