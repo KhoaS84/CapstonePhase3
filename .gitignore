@@ -34,3 +34,7 @@ Thumbs.db
 /techx-corp-platform/src/*
 !/techx-corp-platform/src/llm/
 !/techx-corp-platform/src/product-reviews/
+
+# Bỏ qua thư mục credentials bảo mật của nhóm
+/docs/private/
+

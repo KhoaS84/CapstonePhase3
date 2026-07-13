@@ -43,6 +43,7 @@ Dựa trên thống kê token đo đạc thực tế từ cuộc gọi RAG:
 | **AWS Bedrock** | `amazon.nova-micro-v1:0`          | `$0.035`                   | `$0.140`                    | **`~$0.63 USD`**                | Siêu tiết kiệm, giá tốt nhất trong các model     |
 | **AWS Bedrock** | `meta.llama3-3-70b-instruct-v1:0` | `$0.720`                   | `$0.720`                    | **`~$6.27 USD`**                | Rất đắt, dễ bị timeout (65% lỗi)                 |
 
+
 ### 3. Phân tích & Nhận định kỹ thuật (Technical Analysis & Insights)
 
 - **Phân tích độ ổn định và tỷ lệ lỗi (Reliability)**:
